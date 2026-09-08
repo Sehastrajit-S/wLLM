@@ -50,30 +50,31 @@ If you have a Windows machine with an NVIDIA GPU and want a real inference serve
 
 ## Benchmarks
 
-Measured on an RTX 3060, wLLM vs. real vLLM 0.28.0. vLLM was run under WSL2, since it has no native Windows support at all, so this is the closest possible apples-to-apples comparison on identical hardware.
+Three points of comparison, same RTX 3060, same prompt, same decode-only methodology: plain HuggingFace `transformers` (no serving engine at all, just `AutoModelForCausalLM` and its own KV cache), wLLM, and real vLLM 0.28.0. vLLM was run under WSL2, since it has no native Windows support at all, so this is the closest possible apples-to-apples comparison on identical hardware.
 
-![wLLM vs vLLM decode throughput](benchmarks/throughput_chart.png)
+![Decode throughput: no serving engine vs wLLM vs vLLM](benchmarks/throughput_chart.png)
 
-vLLM is still faster, by 1.2-1.6x, mostly from its more heavily-optimized attention kernels and `torch.compile` fusion. The gap is a constant factor, not an order of magnitude, and it's closing: the "wLLM new" bars are the result of rewriting wLLM's own PagedAttention kernel to follow vLLM's actual multi-warp design (see [`src/wllm/kernels/csrc/paged_attention.cu`](src/wllm/kernels/csrc/paged_attention.cu)), which alone closed roughly a third of the previous gap.
+Two things stand out. First, a real serving engine is a genuine, substantial win over doing nothing: wLLM is 1.3-3.8x faster than plain `transformers`, vLLM 1.6-6.0x, purely from PagedAttention, continuous batching, and CUDA graphs, same weights and same GPU either way. Second, that gain shrinks as the model grows, from roughly 4-6x at 0.5B down to about 1.3-1.8x at 3B: at small model sizes, per-step Python and kernel-launch overhead dominates, and that's exactly what a serving engine eliminates; at 3B, raw matmul compute is a bigger share of the total, so there's proportionally less overhead left to cut.
 
-![wLLM vs vLLM decode throughput table](benchmarks/throughput_table.png)
+![Decode throughput table: no serving engine vs wLLM vs vLLM](benchmarks/throughput_table.png)
 
-The kernel rewrite's own speedup (1.24-1.42x over wLLM's prior kernel) holds consistently across all three model sizes and batch sizes tested. vLLM's remaining lead narrows as batch size grows for the two larger models, but stays fairly flat for the smallest one, consistent with vLLM's optimizations paying off most where per-token overhead (not raw compute) dominates.
+wLLM captures most of the value vLLM adds over plain `transformers`, not just a small fraction of it: at 0.5B it gets roughly 64-77% of vLLM's speedup-over-baseline, and by 3B it's essentially matching vLLM's gain over baseline (85%+). The remaining wLLM-vs-vLLM gap (vLLM still leads by 1.2-1.6x outright, mostly from its more heavily-optimized attention kernels and `torch.compile` fusion) is a gap between two already-optimized systems, not "optimized vs. unoptimized."
 
 ### System configuration used
 
-| Component | wLLM (native Windows) | vLLM (WSL2) |
+| Component | HF / wLLM (native Windows) | vLLM (WSL2) |
 |---|---|---|
 | GPU | NVIDIA GeForce RTX 3060 (12 GB) | same physical GPU, passed through |
 | OS | Windows 11 Pro | Ubuntu 24.04.2 LTS (WSL2 kernel 5.15.167.4) |
 | NVIDIA driver | 610.88 | same driver, shared via WSL2 GPU passthrough |
 | CUDA Toolkit | 13.3 | CUDA 13.0 (bundled with vLLM's torch wheel) |
 | PyTorch | 2.9.1+cu130 | 2.13.0+cu130 |
+| transformers version | 5.16.1 (HF baseline only) | n/a |
 | vLLM version | n/a | 0.28.0 |
 | Compiler | MSVC 2022 + nvcc | n/a (Linux wheel, prebuilt) |
 | Models | Qwen2.5-0.5B / 1.5B / 3B-Instruct, bf16 | same checkpoints, bf16 |
 
-Both engines were run with their fastest available configuration: wLLM with CUDA graphs enabled, vLLM with `torch.compile` and CUDA graphs enabled (its default). See [`scripts/benchmark_cuda_graph.py`](scripts/benchmark_cuda_graph.py) (wLLM side) and [`scripts/vllm_bench_wsl.py`](scripts/vllm_bench_wsl.py) (vLLM side, run inside WSL2) to reproduce, and [`scripts/make_comparison_chart.py`](scripts/make_comparison_chart.py) to regenerate the chart and table above from the source numbers.
+wLLM and vLLM were each run with their fastest available configuration: wLLM with CUDA graphs enabled, vLLM with `torch.compile` and CUDA graphs enabled (its default); the HF baseline uses no such optimizations, by design, since it's standing in for "no serving engine." See [`scripts/benchmark_baseline_hf.py`](scripts/benchmark_baseline_hf.py) (HF side), [`scripts/benchmark_cuda_graph.py`](scripts/benchmark_cuda_graph.py) (wLLM side), and [`scripts/vllm_bench_wsl.py`](scripts/vllm_bench_wsl.py) (vLLM side, run inside WSL2) to reproduce, and [`scripts/make_comparison_chart.py`](scripts/make_comparison_chart.py) to regenerate the chart and table above from the source numbers.
 
 ## Requirements
 

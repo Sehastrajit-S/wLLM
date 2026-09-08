@@ -2,13 +2,15 @@
   - benchmarks/throughput_chart.png  (grouped bar charts only)
   - benchmarks/throughput_table.png  (data table only)
 
-Comparing wLLM (before/after the vLLM-style PagedAttention kernel rewrite)
-against real vLLM 0.28.0, all measured on the same physical RTX 3060 (wLLM
-natively on Windows, vLLM via WSL2 with torch.compile + CUDA graphs enabled).
+Comparing plain HuggingFace `transformers` (no serving engine at all) vs
+wLLM vs real vLLM 0.28.0, all measured on the same physical RTX 3060 (HF and
+wLLM natively on Windows, vLLM via WSL2 with torch.compile + CUDA graphs
+enabled).
 
-Source data is hardcoded from actual benchmark runs (scripts/benchmark_cuda_graph.py
-for wLLM, scripts/vllm_bench_wsl.py run inside WSL2 for vLLM) -- see the
-conversation/commit history for the raw run logs this was transcribed from.
+Source data is hardcoded from actual benchmark runs (scripts/benchmark_baseline_hf.py
+for HF, scripts/benchmark_cuda_graph.py for wLLM, scripts/vllm_bench_wsl.py
+run inside WSL2 for vLLM) -- see the conversation/commit history for the raw
+run logs this was transcribed from.
 
 Run: python scripts/make_comparison_chart.py
 """
@@ -26,12 +28,12 @@ MODELS = ["Qwen2.5-0.5B", "Qwen2.5-1.5B", "Qwen2.5-3B"]
 BATCH_SIZES = [1, 4, 16]
 
 # tokens/sec, [model][batch_size]
-WLLM_OLD = {
-    "Qwen2.5-0.5B": [115.1, 432.8, 1473.2],
-    "Qwen2.5-1.5B": [53.9, 205.8, 789.3],
-    "Qwen2.5-3B": [33.4, 110.1, 379.7],
+HF = {
+    "Qwen2.5-0.5B": [41.5, 161.0, 673.2],
+    "Qwen2.5-1.5B": [26.9, 133.6, 582.5],
+    "Qwen2.5-3B": [28.5, 114.7, 380.1],
 }
-WLLM_NEW = {
+WLLM = {
     "Qwen2.5-0.5B": [157.8, 565.6, 2096.1],
     "Qwen2.5-1.5B": [72.8, 271.9, 1033.8],
     "Qwen2.5-3B": [41.5, 145.0, 533.5],
@@ -42,8 +44,8 @@ VLLM = {
     "Qwen2.5-3B": [48.8, 180.9, 673.8],
 }
 
-COLOR_OLD = "#94a3b8"
-COLOR_NEW = "#2563eb"
+COLOR_HF = "#94a3b8"
+COLOR_WLLM = "#2563eb"
 COLOR_VLLM = "#dc2626"
 
 
@@ -55,18 +57,18 @@ def make_chart(out_path: str) -> None:
 
     for i, model in enumerate(MODELS):
         ax = fig.add_subplot(gs[0, i])
-        old_vals = WLLM_OLD[model]
-        new_vals = WLLM_NEW[model]
+        hf_vals = HF[model]
+        wllm_vals = WLLM[model]
         vllm_vals = VLLM[model]
 
-        ax.bar(x - bar_width, old_vals, bar_width, label="wLLM (original kernel)", color=COLOR_OLD)
-        ax.bar(x, new_vals, bar_width, label="wLLM (vLLM-style kernel)", color=COLOR_NEW)
+        ax.bar(x - bar_width, hf_vals, bar_width, label="Plain HF transformers (no serving engine)", color=COLOR_HF)
+        ax.bar(x, wllm_vals, bar_width, label="wLLM (CUDA graphs)", color=COLOR_WLLM)
         ax.bar(x + bar_width, vllm_vals, bar_width, label="vLLM 0.28.0 (WSL2, compiled)", color=COLOR_VLLM)
 
-        for xi, v in zip(x - bar_width, old_vals):
+        for xi, v in zip(x - bar_width, hf_vals):
             ax.text(xi, v, f"{v:.0f}", ha="center", va="bottom", fontsize=8, color="#475569")
-        for xi, v in zip(x, new_vals):
-            ax.text(xi, v, f"{v:.0f}", ha="center", va="bottom", fontsize=8, color=COLOR_NEW, fontweight="bold")
+        for xi, v in zip(x, wllm_vals):
+            ax.text(xi, v, f"{v:.0f}", ha="center", va="bottom", fontsize=8, color=COLOR_WLLM, fontweight="bold")
         for xi, v in zip(x + bar_width, vllm_vals):
             ax.text(xi, v, f"{v:.0f}", ha="center", va="bottom", fontsize=8, color=COLOR_VLLM)
 
@@ -78,8 +80,8 @@ def make_chart(out_path: str) -> None:
         ax.spines["right"].set_visible(False)
         ax.grid(axis="y", alpha=0.25)
 
-    fig.text(0.5, 0.97, "wLLM vs vLLM: PagedAttention decode throughput", ha="center", fontsize=15, fontweight="bold")
-    fig.text(0.5, 0.935, "wLLM: native Windows. vLLM: WSL2, torch.compile + CUDA graphs. Higher is better.", ha="center", fontsize=9.5, color="#475569")
+    fig.text(0.5, 0.97, "Decode throughput: no serving engine vs wLLM vs vLLM", ha="center", fontsize=15, fontweight="bold")
+    fig.text(0.5, 0.935, "HF and wLLM: native Windows. vLLM: WSL2, torch.compile + CUDA graphs. Higher is better.", ha="center", fontsize=9.5, color="#475569")
     handles, labels = fig.axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.9), ncol=3, fontsize=11, frameon=False)
 
@@ -91,17 +93,17 @@ def make_table(out_path: str) -> None:
     rows = []
     for model in MODELS:
         for j, b in enumerate(BATCH_SIZES):
-            old_v, new_v, vllm_v = WLLM_OLD[model][j], WLLM_NEW[model][j], VLLM[model][j]
-            speedup = new_v / old_v
-            vllm_ratio = vllm_v / new_v
+            hf_v, wllm_v, vllm_v = HF[model][j], WLLM[model][j], VLLM[model][j]
+            wllm_ratio = wllm_v / hf_v
+            vllm_ratio = vllm_v / hf_v
             rows.append([
-                model, str(b), f"{old_v:.1f}", f"{new_v:.1f}", f"{speedup:.2f}x",
+                model, str(b), f"{hf_v:.1f}", f"{wllm_v:.1f}", f"{wllm_ratio:.2f}x",
                 f"{vllm_v:.1f}", f"{vllm_ratio:.2f}x",
             ])
 
     col_labels = [
-        "Model", "Batch", "wLLM old\n(tok/s)", "wLLM new\n(tok/s)", "Kernel\nspeedup",
-        "vLLM\n(tok/s)", "vLLM still\nahead by",
+        "Model", "Batch", "Plain HF\n(tok/s)", "wLLM\n(tok/s)", "wLLM vs\nHF",
+        "vLLM\n(tok/s)", "vLLM vs\nHF",
     ]
 
     fig, ax_table = plt.subplots(figsize=(11, 4.3))
@@ -122,11 +124,11 @@ def make_table(out_path: str) -> None:
             cell = table[r, c]
             cell.set_facecolor("#f8fafc" if r % 2 == 0 else "white")
             if c == 4:
-                cell.set_text_props(color=COLOR_NEW, fontweight="bold")
+                cell.set_text_props(color=COLOR_WLLM, fontweight="bold")
             if c == 6:
                 cell.set_text_props(color=COLOR_VLLM)
 
-    fig.text(0.5, 0.04, "Data: scripts/benchmark_cuda_graph.py (wLLM) and scripts/vllm_bench_wsl.py (vLLM, run inside WSL2)", ha="center", fontsize=8, color="#94a3b8", style="italic")
+    fig.text(0.5, 0.04, "Data: scripts/benchmark_baseline_hf.py (HF), scripts/benchmark_cuda_graph.py (wLLM), scripts/vllm_bench_wsl.py (vLLM, run inside WSL2)", ha="center", fontsize=8, color="#94a3b8", style="italic")
 
     fig.savefig(out_path, dpi=150, bbox_inches="tight", facecolor="white")
     print(f"saved {out_path}")
