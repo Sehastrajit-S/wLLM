@@ -12,13 +12,13 @@
 
 ---
 
-vLLM doesn't run on Windows. wLLM is an independent reimplementation of vLLM's core ideas — PagedAttention, continuous batching, CUDA graphs — as a native CUDA/C++ + PyTorch inference engine that runs directly on Windows, no WSL2 or Docker required, with an OpenAI-compatible API on top.
+vLLM doesn't run on Windows. wLLM is an independent reimplementation of vLLM's core ideas (PagedAttention, continuous batching, CUDA graphs) as a native CUDA/C++ + PyTorch inference engine that runs directly on Windows, no WSL2 or Docker required, with an OpenAI-compatible API on top.
 
 Single GPU, single machine, NVIDIA CUDA only. Everything below was built and benchmarked on an RTX 3060.
 
 ## Why this exists
 
-If you have a Windows machine with an NVIDIA GPU and want a real inference server — continuous batching, paged KV cache, CUDA graphs, quantization, guided decoding — your options have been "install WSL2 and hope it all works" or "don't." wLLM is the other option: a from-scratch engine that targets Windows as a first-class platform, with the same production concerns (auth, rate limiting, structured logging, Windows Service packaging) as any real deployment target.
+If you have a Windows machine with an NVIDIA GPU and want a real inference server (continuous batching, paged KV cache, CUDA graphs, quantization, guided decoding), your options have been "install WSL2 and hope it all works" or "don't." wLLM is the other option: a from-scratch engine that targets Windows as a first-class platform, with the same production concerns (auth, rate limiting, structured logging, Windows Service packaging) as any real deployment target.
 
 ## Features
 
@@ -50,11 +50,11 @@ If you have a Windows machine with an NVIDIA GPU and want a real inference serve
 
 ## Benchmarks
 
-Measured on an RTX 3060, WinLLM vs. real vLLM 0.28.0 (vLLM run under WSL2, since it has no native Windows support at all — this is the closest possible apples-to-apples comparison on identical hardware):
+Measured on an RTX 3060, WinLLM vs. real vLLM 0.28.0 (vLLM run under WSL2, since it has no native Windows support at all, so this is the closest possible apples-to-apples comparison on identical hardware):
 
 ![WinLLM vs vLLM benchmark](benchmarks/winllm_vs_vllm.png)
 
-vLLM is still faster (1.2-1.6x, mostly from its more heavily-optimized attention kernels and `torch.compile` fusion) — but the gap is a constant-factor, not an order of magnitude, and it's closing. See [`scripts/benchmark_cuda_graph.py`](scripts/benchmark_cuda_graph.py) and [`scripts/make_comparison_chart.py`](scripts/make_comparison_chart.py) to reproduce.
+vLLM is still faster (1.2-1.6x, mostly from its more heavily-optimized attention kernels and `torch.compile` fusion). The gap is a constant-factor, not an order of magnitude, and it's closing. See [`scripts/benchmark_cuda_graph.py`](scripts/benchmark_cuda_graph.py) and [`scripts/make_comparison_chart.py`](scripts/make_comparison_chart.py) to reproduce.
 
 ## Requirements
 
@@ -64,7 +64,7 @@ vLLM is still faster (1.2-1.6x, mostly from its more heavily-optimized attention
 - Visual Studio 2022 (or Build Tools) with the "Desktop development with C++" workload, for MSVC
 - Python 3.11 or 3.12
 
-You don't need to manually configure `PATH`/`CUDA_HOME`/`vcvarsall.bat` — wLLM locates MSVC and CUDA automatically the first time it needs to build its kernel (see [`src/wllm/kernels/_msvc_env.py`](src/wllm/kernels/_msvc_env.py)).
+You don't need to manually configure `PATH`/`CUDA_HOME`/`vcvarsall.bat`. wLLM locates MSVC and CUDA automatically the first time it needs to build its kernel (see [`src/wllm/kernels/_msvc_env.py`](src/wllm/kernels/_msvc_env.py)).
 
 ## Installation
 
@@ -74,7 +74,7 @@ cd wLLM
 pip install -e .
 ```
 
-The first request that triggers a decode step will JIT-compile the CUDA kernel (via `torch.utils.cpp_extension`) — this takes about a minute, once, and is cached afterward.
+The first request that triggers a decode step will JIT-compile the CUDA kernel (via `torch.utils.cpp_extension`). This takes about a minute, once, and is cached afterward.
 
 ## Quickstart
 
@@ -114,7 +114,7 @@ Being upfront about scope, same as the rest of this README:
 - Multi-GPU / multi-node (single GPU, single machine only)
 - Multi-modal / vision-language models
 - AMD or non-NVIDIA GPUs, DirectML
-- The PagedAttention kernel is warp-parallel but not yet using tensor cores or fp16 native arithmetic — see the benchmark numbers above for where that leaves it relative to vLLM
+- The PagedAttention kernel is warp-parallel but not yet using tensor cores or fp16 native arithmetic; see the benchmark numbers above for where that leaves it relative to vLLM
 
 ## Development
 
@@ -129,4 +129,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE).
+Apache 2.0, see [LICENSE](LICENSE).
