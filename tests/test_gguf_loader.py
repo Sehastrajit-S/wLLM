@@ -25,6 +25,15 @@ def tokenizer():
 
 @pytest.fixture(scope="module")
 def prompt_ids(tokenizer):
+    # Skip must live here, not in the test bodies below: pytest resolves
+    # fixtures during test setup, before the test function itself runs, so a
+    # `pytest.skip()` inside the test body never gets a chance to fire if
+    # this fixture raises first (exactly what happened in CI once the
+    # .gitignore bug was fixed and this file was actually collected/run for
+    # the first time -- `.to("cuda")` here errored at setup instead of
+    # skipping cleanly like every other test in this file already does).
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA not available")
     inputs = tokenizer.apply_chat_template(PROMPT, add_generation_prompt=True, return_dict=True, return_tensors="pt")
     return inputs["input_ids"].to("cuda")
 
