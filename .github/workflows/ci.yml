@@ -44,6 +44,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install ruff
-        run: pip install ruff
+        # Pinned: an unpinned `pip install ruff` picks up whatever's newest
+        # on the day CI happens to run, and ruff's import-sort heuristics
+        # have changed between versions -- pin so local and CI runs agree.
+        run: pip install ruff==0.16.6
       - name: Ruff check
         run: ruff check src/ tests/ scripts/

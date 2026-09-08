@@ -47,7 +47,7 @@ wllm-server = "wllm.cli:main"
 dev = [
     "pytest",
     "pytest-asyncio",
-    "ruff",
+    "ruff==0.16.6",
     "matplotlib",
 ]
 service = [
