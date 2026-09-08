@@ -40,6 +40,7 @@ def make_cache(model, num_blocks, block_size=16):
     )
 
 
+@torch.inference_mode()
 def benchmark_batch_size(model, tokenizer, batch_size: int) -> float:
     """Returns aggregate decode throughput in tokens/sec across `batch_size`
     concurrently-running sequences.

@@ -2,8 +2,9 @@
 instead of eager Scheduler._decode_active, to quantify the actual CUDA
 graph speedup at each bucketed batch size.
 
-Run: python scripts/benchmark_cuda_graph.py [model_id] [comma,separated,batch,sizes]
+Run: python scripts/benchmark_cuda_graph.py [model_id] [comma,separated,batch,sizes] [--gguf PATH] [--tokenizer ID]
 """
+import argparse
 import sys
 import time
 
@@ -16,6 +17,7 @@ from wllm.baseline.model import DEFAULT_MODEL_ID
 from wllm.engine.cuda_graph_decoder import CUDAGraphDecoder
 from wllm.engine.kv_cache import KVCacheManager
 from wllm.models.qwen2 import load_native
+from wllm.quant.gguf_loader import load_gguf
 
 PROMPT = [{"role": "user", "content": "Tell me a short story about a robot who learns to paint."}]
 DECODE_STEPS = 64
@@ -66,12 +68,21 @@ def benchmark_batch_size(model, tokenizer, decoder: CUDAGraphDecoder, cache, bat
 
 
 def main() -> int:
-    model_id = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_MODEL_ID
-    bucket_sizes = tuple(int(b) for b in sys.argv[2].split(",")) if len(sys.argv) > 2 else BUCKET_SIZES
+    parser = argparse.ArgumentParser()
+    parser.add_argument("model_id", nargs="?", default=DEFAULT_MODEL_ID)
+    parser.add_argument("batch_sizes", nargs="?", default=None, help="comma,separated,batch,sizes")
+    parser.add_argument("--gguf", default=None, help="Path to a single-file GGUF checkpoint (Q4_0/Q8_0) -- loads via load_gguf instead of load_native")
+    parser.add_argument("--tokenizer", default=None, help="HF tokenizer repo for --gguf (defaults to model_id)")
+    args = parser.parse_args()
 
-    print(f"Loading {model_id}...")
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
-    model = load_native(model_id, dtype=torch.bfloat16)
+    bucket_sizes = tuple(int(b) for b in args.batch_sizes.split(",")) if args.batch_sizes else BUCKET_SIZES
+
+    print(f"Loading {args.gguf or args.model_id}...")
+    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer or args.model_id)
+    if args.gguf:
+        model = load_gguf(args.gguf, device="cuda", compute_dtype=torch.bfloat16)
+    else:
+        model = load_native(args.model_id, dtype=torch.bfloat16)
 
     max_batch = max(bucket_sizes)
     cache = make_cache(model, num_blocks=max_batch * 32 + max_batch)  # +scratch headroom

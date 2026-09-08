@@ -15,7 +15,7 @@ import numpy as np
 import torch
 
 from wllm.models.config import ModelConfig
-from wllm.models.qwen2 import Qwen2ForCausalLM
+from wllm.models.qwen2 import Qwen2ForCausalLM, RotaryEmbedding
 from wllm.quant.dequant import GGML_TYPE_F16, GGML_TYPE_F32, dequantize
 from wllm.quant.quant_linear import QuantizedLinear
 
@@ -106,7 +106,24 @@ def load_gguf(path: str, device: str = "cuda", compute_dtype: torch.dtype = torc
         tie_word_embeddings=False,  # we always materialize an explicit lm_head below
     )
 
-    model = Qwen2ForCausalLM(cfg)
+    # Meta device: constructing Qwen2ForCausalLM the normal way allocates a
+    # real, full-precision (fp32, PyTorch's default) nn.Linear for every
+    # attention/MLP matrix -- including the ones about to be thrown away and
+    # replaced with a compact QuantizedLinear below. For a 7B+ model that
+    # transient skeleton is 25-30GB of host RAM for weights that live for a
+    # few milliseconds, easily exceeding a normal machine's free RAM and
+    # crashing (this is exactly what happened testing a 7B checkpoint: a
+    # hard segfault during construction, before any GGUF tensor was even
+    # touched). Building on the meta device instead allocates shape/dtype
+    # metadata only, no storage -- real data lands only where state_dict
+    # (assign=True below) or the QuantizedLinear replacement loop actually
+    # puts it.
+    with torch.device("meta"):
+        model = Qwen2ForCausalLM(cfg)
+    # The only non-persistent buffer in the model -- meta construction skips
+    # it entirely (persistent=False means it's never in state_dict either),
+    # so it needs recomputing for real rather than relying on load_state_dict.
+    model.model.rotary_emb = RotaryEmbedding(cfg.head_dim, cfg.rope_theta)
 
     state_dict: dict[str, torch.Tensor] = {}
     quantized: dict[str, tuple[torch.Tensor, int, tuple[int, int]]] = {}
@@ -134,7 +151,11 @@ def load_gguf(path: str, device: str = "cuda", compute_dtype: torch.dtype = torc
             flat = dequantize(raw, ggml_type, t.n_elements)
             state_dict[mapped] = flat.reshape(_tensor_shape(t))
 
-    missing, unexpected = model.load_state_dict(state_dict, strict=False)
+    # assign=True: the model's own parameters are meta tensors with no
+    # storage, so the normal copy_-into-existing-tensor behavior can't work
+    # here -- assign replaces them outright with the real tensors from
+    # state_dict instead.
+    missing, unexpected = model.load_state_dict(state_dict, strict=False, assign=True)
     missing = set(missing) - set(quantized.keys())
     if missing:
         raise RuntimeError(f"Missing keys after GGUF load: {missing}")

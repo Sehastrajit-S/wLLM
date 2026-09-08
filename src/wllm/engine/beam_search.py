@@ -40,6 +40,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import torch
+
 
 @dataclass
 class BeamSearchParams:
@@ -100,6 +102,7 @@ class BeamGroup:
         self.finish_reason = "stop" if self.finished else "length"
         self.beams = []
 
+    @torch.inference_mode()
     def step(self, model, cache, lora_registry=None) -> None:
         """Advances every active beam by exactly one token. Call repeatedly
         (typically once per Scheduler.step()) until is_done() is True.

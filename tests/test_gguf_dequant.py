@@ -12,11 +12,20 @@ from huggingface_hub import hf_hub_download
 from wllm.quant.dequant import (
     GGML_TYPE_F32,
     GGML_TYPE_Q4_0,
+    GGML_TYPE_Q4_1,
+    GGML_TYPE_Q6_K,
     GGML_TYPE_Q8_0,
     dequantize,
 )
 
 REPO = "Qwen/Qwen2.5-0.5B-Instruct-GGUF"
+# bartowski's conversions mix in Q4_1 (a few "sensitive" layers) and Q6_K
+# (output.weight) even in a nominally "Q4_0" file -- the real-world
+# convention that made those two types necessary to support at all (see
+# dequant.py's module docstring). Qwen's own official Q4_0 conversion
+# doesn't do this (confirmed: no Q4_1/Q6_K tensors in it), so this needs a
+# different, still-small repo specifically to exercise them.
+MIXED_QUANT_REPO = "bartowski/Qwen2.5-1.5B-Instruct-GGUF"
 
 
 @pytest.fixture(scope="module")
@@ -27,6 +36,11 @@ def q8_0_path():
 @pytest.fixture(scope="module")
 def q4_0_path():
     return hf_hub_download(REPO, "qwen2.5-0.5b-instruct-q4_0.gguf")
+
+
+@pytest.fixture(scope="module")
+def mixed_quant_path():
+    return hf_hub_download(MIXED_QUANT_REPO, "Qwen2.5-1.5B-Instruct-Q4_0.gguf")
 
 
 def _first_tensor_of_type(reader: gguf.GGUFReader, ggml_type: int):
@@ -60,6 +74,38 @@ def test_q4_0_matches_reference_dequantizer(q4_0_path):
     reference = torch.from_numpy(np.ascontiguousarray(reference))
 
     assert torch.equal(mine, reference), "Q4_0 dequant does not exactly match the reference implementation"
+
+
+def test_q4_1_matches_reference_dequantizer(mixed_quant_path):
+    reader = gguf.GGUFReader(mixed_quant_path)
+    t = _first_tensor_of_type(reader, GGML_TYPE_Q4_1)
+
+    raw = torch.from_numpy(np.ascontiguousarray(t.data).reshape(-1))
+    mine = dequantize(raw, GGML_TYPE_Q4_1, t.n_elements)
+
+    reference = gguf.quants.dequantize(t.data, gguf.GGMLQuantizationType(t.tensor_type)).reshape(-1)
+    reference = torch.from_numpy(np.ascontiguousarray(reference))
+
+    assert torch.equal(mine, reference), "Q4_1 dequant does not exactly match the reference implementation"
+
+
+def test_q6_k_matches_reference_dequantizer(mixed_quant_path):
+    reader = gguf.GGUFReader(mixed_quant_path)
+    t = _first_tensor_of_type(reader, GGML_TYPE_Q6_K)
+
+    raw = torch.from_numpy(np.ascontiguousarray(t.data).reshape(-1))
+    mine = dequantize(raw, GGML_TYPE_Q6_K, t.n_elements)
+
+    reference = gguf.quants.dequantize(t.data, gguf.GGMLQuantizationType(t.tensor_type)).reshape(-1)
+    reference = torch.from_numpy(np.ascontiguousarray(reference))
+
+    # Q6_K's reference dequantizer in the gguf package computes in float32
+    # through a slightly different (numerically equivalent, not bit-identical)
+    # instruction sequence than ours -- exact equality is too strict here,
+    # unlike the purely-linear Q8_0/Q4_0/Q4_1 formulas above. A tight
+    # tolerance still catches a real implementation bug (wrong bit layout
+    # would be off by a large, structured amount, not a rounding-level diff).
+    torch.testing.assert_close(mine, reference, atol=1e-3, rtol=1e-3)
 
 
 def test_f32_tensor_passthrough_matches_original(q8_0_path):

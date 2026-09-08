@@ -444,6 +444,7 @@ class Scheduler:
                 still_active.append(group)
         self.beam_groups = still_active
 
+    @torch.inference_mode()
     def step(self) -> list[Sequence]:
         """Runs one scheduler iteration. Returns every sequence that got a
         new token this step -- ones whose prefill just completed (whether in
