@@ -29,7 +29,7 @@ If you have a Windows machine with an NVIDIA GPU and want a real inference serve
 - Automatic prefix caching (shared system prompts / multi-turn history reused, not recomputed)
 - Chunked prefill (long prompts don't stall other requests' decode progress)
 - CPU-swap preemption (evicted sequences resume exactly where they left off, no lost work)
-- GGUF quantization (Q4_0 / Q8_0) with dequant-on-the-fly linear layers
+- GGUF quantization (F32 / F16 / Q8_0 / Q4_0 / Q4_1 / Q6_K) with dequant-on-the-fly linear layers
 
 **Serving**
 - OpenAI-compatible REST API: `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings`, `/v1/rerank`, `/v1/models`
@@ -47,6 +47,12 @@ If you have a Windows machine with an NVIDIA GPU and want a real inference serve
 - Prometheus metrics (`/metrics`)
 - Windows Service packaging (runs as a real background service, not just a terminal process)
 - CI (GitHub Actions), lint-clean via `ruff`
+
+## Supported models
+
+**Qwen2 and Qwen2.5** (all sizes, including Coder/Math variants) and **Llama** (Llama 2, TinyLlama, and other checkpoints that don't rely on Llama 3's extended-context RoPE scaling, which isn't implemented yet). Both architectures share the same RMSNorm/RoPE/grouped-query-attention/SwiGLU-MLP recipe and the same HF weight-naming convention (Qwen2's format was deliberately designed as a drop-in match for Llama's); the one structural difference (Qwen2 puts a bias on its q/k/v projections, Llama doesn't) is read straight from the checkpoint's `config.json`, not hardcoded. In practice this means the PagedAttention kernel, scheduler, and KV cache never needed to change to pick up a second architecture, only the config parsing and one `Linear` layer's bias flag did, the same core-infra-is-architecture-agnostic split real vLLM relies on to support the dozens of architectures it does.
+
+Weight format: HF safetensors (bf16/fp16, VRAM permitting) or a single-file GGUF checkpoint (F32/F16/Q8_0/Q4_0/Q4_1/Q6_K). Not yet supported: AWQ/GPTQ/bitsandbytes, split/multi-shard GGUF files, other K-quants (Q4_K/Q5_K/etc.) and I-quants, or any architecture outside the Qwen2/Llama family (Mistral, Gemma, Phi, DeepSeek, etc. would each need their own model file, the same way vLLM itself has one per architecture).
 
 ## Benchmarks
 

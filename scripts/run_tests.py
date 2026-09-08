@@ -30,6 +30,24 @@ def main() -> int:
         capture_output=True, text=True,
     )
     test_files = sorted({line.split("::")[0] for line in result.stdout.splitlines() if "::" in line})
+
+    # A file that fails to even import (e.g. a missing package -- this is
+    # exactly how a real bug slipped past CI unnoticed: a .gitignore rule
+    # accidentally excluded src/wllm/models/ from every commit, so every
+    # test file depending on it errored out of collection, and this script
+    # used to only check "did we find zero files", not "did collection
+    # itself report errors" -- so it silently ran the handful of files that
+    # happened not to need the missing package and called that a clean
+    # pass). Any non-zero exit here means the file list below is not
+    # trustworthy, regardless of whether it's empty.
+    if result.returncode != 0:
+        print(f"ERROR: `pytest --collect-only` exited {result.returncode} -- at least one test file "
+              "failed to even import. The file list below would be silently incomplete if we "
+              "proceeded, so treating this as a hard failure instead:\n")
+        print(result.stdout)
+        print(result.stderr)
+        return 1
+
     if not test_files:
         print("no test files discovered -- collection may have failed:\n" + result.stdout + result.stderr)
         return 1

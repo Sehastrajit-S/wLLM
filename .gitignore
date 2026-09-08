@@ -7,7 +7,7 @@ dist/
 .pytest_cache/
 .ruff_cache/
 .claude/
-models/
+/models/
 *.safetensors
 *.gguf
 .env
