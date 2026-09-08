@@ -1,0 +1,72 @@
+[project]
+name = "wllm"
+version = "0.1.0"
+description = "A vLLM-style, production-grade LLM inference server built natively for Windows (single GPU, single machine)"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11,<3.13"
+authors = [{ name = "Sehastrajit" }]
+keywords = ["llm", "inference", "cuda", "windows", "paged-attention", "vllm", "openai-api"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "torch>=2.4",
+    "transformers>=4.44",
+    "tokenizers",
+    "safetensors",
+    "huggingface-hub",
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic>=2",
+    "ninja",
+    "numpy",
+    "accelerate",
+    "prometheus-client",
+    "gguf",
+    "outlines-core",
+    "httpx",
+]
+
+[project.urls]
+Homepage = "https://github.com/Sehastrajit-S/wLLM"
+Repository = "https://github.com/Sehastrajit-S/wLLM"
+Issues = "https://github.com/Sehastrajit-S/wLLM/issues"
+
+[project.scripts]
+wllm-server = "wllm.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "ruff",
+    "matplotlib",
+]
+service = [
+    "pywin32",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 140
+
+[tool.ruff.lint]
+# Pyflakes (real bugs: unused imports/vars, undefined names) + isort (import
+# order) -- deliberately not ruff's broader style/opinion rule categories
+# (pycodestyle, bugbear, etc.), which weren't in force while this codebase
+# was written and would flag pre-existing style choices rather than defects.
+select = ["F", "I"]
