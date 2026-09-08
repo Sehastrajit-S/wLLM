@@ -70,3 +70,12 @@ line-length = 140
 # (pycodestyle, bugbear, etc.), which weren't in force while this codebase
 # was written and would flag pre-existing style choices rather than defects.
 select = ["F", "I"]
+
+[tool.ruff.lint.isort]
+# Without this, ruff's isort guesses which packages are "first-party" by
+# scanning the working directory, and that guess isn't always stable on a
+# fresh checkout with no .ruff_cache (exactly what CI runs) -- it flagged
+# `wllm.models.*` imports as a different group than `wllm.engine.*`/
+# `wllm.baseline.*` in CI while a locally-cached run stayed consistent.
+# Declaring the package explicitly removes the guesswork.
+known-first-party = ["wllm"]
