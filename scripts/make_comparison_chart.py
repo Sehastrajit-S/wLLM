@@ -1,5 +1,8 @@
-"""Generates benchmarks/wllm_vs_vllm.png: a table + grouped bar charts
-comparing wLLM (before/after the vLLM-style PagedAttention kernel rewrite)
+"""Generates the two separate benchmark images used in the README:
+  - benchmarks/throughput_chart.png  (grouped bar charts only)
+  - benchmarks/throughput_table.png  (data table only)
+
+Comparing wLLM (before/after the vLLM-style PagedAttention kernel rewrite)
 against real vLLM 0.28.0, all measured on the same physical RTX 3060 (wLLM
 natively on Windows, vLLM via WSL2 with torch.compile + CUDA graphs enabled).
 
@@ -44,17 +47,14 @@ COLOR_NEW = "#2563eb"
 COLOR_VLLM = "#dc2626"
 
 
-def main() -> None:
-    fig = plt.figure(figsize=(14, 12))
-    gs = fig.add_gridspec(2, 1, height_ratios=[2.1, 1], hspace=0.35, top=0.85, bottom=0.06)
-
-    # --- Bar charts: one subplot per model, batch size on x-axis ---
-    gs_top = gs[0].subgridspec(1, 3, wspace=0.18)
+def make_chart(out_path: str) -> None:
+    fig = plt.figure(figsize=(14, 6.5))
+    gs = fig.add_gridspec(1, 3, wspace=0.18, top=0.78, bottom=0.12)
     bar_width = 0.26
     x = np.arange(len(BATCH_SIZES))
 
     for i, model in enumerate(MODELS):
-        ax = fig.add_subplot(gs_top[0, i])
+        ax = fig.add_subplot(gs[0, i])
         old_vals = WLLM_OLD[model]
         new_vals = WLLM_NEW[model]
         vllm_vals = VLLM[model]
@@ -78,15 +78,16 @@ def main() -> None:
         ax.spines["right"].set_visible(False)
         ax.grid(axis="y", alpha=0.25)
 
-    fig.text(0.5, 0.975, "wLLM vs vLLM: PagedAttention decode throughput, same RTX 3060", ha="center", fontsize=15, fontweight="bold")
-    fig.text(0.5, 0.955, "wLLM: native Windows. vLLM: WSL2, torch.compile + CUDA graphs. Higher is better.", ha="center", fontsize=9.5, color="#475569")
+    fig.text(0.5, 0.97, "wLLM vs vLLM: PagedAttention decode throughput", ha="center", fontsize=15, fontweight="bold")
+    fig.text(0.5, 0.935, "wLLM: native Windows. vLLM: WSL2, torch.compile + CUDA graphs. Higher is better.", ha="center", fontsize=9.5, color="#475569")
     handles, labels = fig.axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.925), ncol=3, fontsize=11, frameon=False)
+    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.9), ncol=3, fontsize=11, frameon=False)
 
-    # --- Table ---
-    ax_table = fig.add_subplot(gs[1])
-    ax_table.axis("off")
+    fig.savefig(out_path, dpi=150, bbox_inches="tight", facecolor="white")
+    print(f"saved {out_path}")
 
+
+def make_table(out_path: str) -> None:
     rows = []
     for model in MODELS:
         for j, b in enumerate(BATCH_SIZES):
@@ -102,6 +103,10 @@ def main() -> None:
         "Model", "Batch", "wLLM old\n(tok/s)", "wLLM new\n(tok/s)", "Kernel\nspeedup",
         "vLLM\n(tok/s)", "vLLM still\nahead by",
     ]
+
+    fig, ax_table = plt.subplots(figsize=(11, 4.3))
+    ax_table.axis("off")
+
     table = ax_table.table(cellText=rows, colLabels=col_labels, loc="center", cellLoc="center")
     table.auto_set_font_size(False)
     table.set_fontsize(9.5)
@@ -121,11 +126,15 @@ def main() -> None:
             if c == 6:
                 cell.set_text_props(color=COLOR_VLLM)
 
-    fig.text(0.5, 0.025, "Data: scripts/benchmark_cuda_graph.py (wLLM) and scripts/vllm_bench_wsl.py (vLLM, run inside WSL2)", ha="center", fontsize=8, color="#94a3b8", style="italic")
+    fig.text(0.5, 0.04, "Data: scripts/benchmark_cuda_graph.py (wLLM) and scripts/vllm_bench_wsl.py (vLLM, run inside WSL2)", ha="center", fontsize=8, color="#94a3b8", style="italic")
 
-    out_path = "benchmarks/wllm_vs_vllm.png"
     fig.savefig(out_path, dpi=150, bbox_inches="tight", facecolor="white")
     print(f"saved {out_path}")
+
+
+def main() -> None:
+    make_chart("benchmarks/throughput_chart.png")
+    make_table("benchmarks/throughput_table.png")
 
 
 if __name__ == "__main__":

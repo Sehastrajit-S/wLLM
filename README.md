@@ -50,11 +50,30 @@ If you have a Windows machine with an NVIDIA GPU and want a real inference serve
 
 ## Benchmarks
 
-Measured on an RTX 3060, WinLLM vs. real vLLM 0.28.0 (vLLM run under WSL2, since it has no native Windows support at all, so this is the closest possible apples-to-apples comparison on identical hardware):
+Measured on an RTX 3060, wLLM vs. real vLLM 0.28.0. vLLM was run under WSL2, since it has no native Windows support at all, so this is the closest possible apples-to-apples comparison on identical hardware.
 
-![WinLLM vs vLLM benchmark](benchmarks/winllm_vs_vllm.png)
+![wLLM vs vLLM decode throughput](benchmarks/throughput_chart.png)
 
-vLLM is still faster (1.2-1.6x, mostly from its more heavily-optimized attention kernels and `torch.compile` fusion). The gap is a constant-factor, not an order of magnitude, and it's closing. See [`scripts/benchmark_cuda_graph.py`](scripts/benchmark_cuda_graph.py) and [`scripts/make_comparison_chart.py`](scripts/make_comparison_chart.py) to reproduce.
+vLLM is still faster, by 1.2-1.6x, mostly from its more heavily-optimized attention kernels and `torch.compile` fusion. The gap is a constant factor, not an order of magnitude, and it's closing: the "wLLM new" bars are the result of rewriting wLLM's own PagedAttention kernel to follow vLLM's actual multi-warp design (see [`src/wllm/kernels/csrc/paged_attention.cu`](src/wllm/kernels/csrc/paged_attention.cu)), which alone closed roughly a third of the previous gap.
+
+![wLLM vs vLLM decode throughput table](benchmarks/throughput_table.png)
+
+The kernel rewrite's own speedup (1.24-1.42x over wLLM's prior kernel) holds consistently across all three model sizes and batch sizes tested. vLLM's remaining lead narrows as batch size grows for the two larger models, but stays fairly flat for the smallest one, consistent with vLLM's optimizations paying off most where per-token overhead (not raw compute) dominates.
+
+### System configuration used
+
+| Component | wLLM (native Windows) | vLLM (WSL2) |
+|---|---|---|
+| GPU | NVIDIA GeForce RTX 3060 (12 GB) | same physical GPU, passed through |
+| OS | Windows 11 Pro | Ubuntu 24.04.2 LTS (WSL2 kernel 5.15.167.4) |
+| NVIDIA driver | 610.88 | same driver, shared via WSL2 GPU passthrough |
+| CUDA Toolkit | 13.3 | CUDA 13.0 (bundled with vLLM's torch wheel) |
+| PyTorch | 2.9.1+cu130 | 2.13.0+cu130 |
+| vLLM version | n/a | 0.28.0 |
+| Compiler | MSVC 2022 + nvcc | n/a (Linux wheel, prebuilt) |
+| Models | Qwen2.5-0.5B / 1.5B / 3B-Instruct, bf16 | same checkpoints, bf16 |
+
+Both engines were run with their fastest available configuration: wLLM with CUDA graphs enabled, vLLM with `torch.compile` and CUDA graphs enabled (its default). See [`scripts/benchmark_cuda_graph.py`](scripts/benchmark_cuda_graph.py) (wLLM side) and [`scripts/vllm_bench_wsl.py`](scripts/vllm_bench_wsl.py) (vLLM side, run inside WSL2) to reproduce, and [`scripts/make_comparison_chart.py`](scripts/make_comparison_chart.py) to regenerate the chart and table above from the source numbers.
 
 ## Requirements
 
