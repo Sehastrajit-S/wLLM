@@ -61,6 +61,14 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+# The CUDA kernel source itself: setuptools doesn't ship non-.py files by
+# default, and torch.utils.cpp_extension.load() needs this file present on
+# disk at runtime (it JIT-compiles it there, on the end user's machine) --
+# without this, a wheel installed from PyPI would have no kernel source to
+# compile at all, failing on the first decode step with FileNotFoundError.
+wllm = ["kernels/csrc/*.cu"]
+
 [tool.ruff]
 line-length = 140
 

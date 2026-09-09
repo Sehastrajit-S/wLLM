@@ -100,12 +100,28 @@ You don't need to manually configure `PATH`/`CUDA_HOME`/`vcvarsall.bat`. wLLM lo
 ## Installation
 
 ```bash
+pip install wllm
+# or: uv pip install wllm / uv add wllm
+```
+
+Or from source:
+
+```bash
 git clone https://github.com/Sehastrajit-S/wLLM.git
 cd wLLM
 pip install -e .
 ```
 
 The first request that triggers a decode step will JIT-compile the CUDA kernel (via `torch.utils.cpp_extension`). This takes about a minute, once, and is cached afterward.
+
+### Docker
+
+```bash
+docker build -t wllm .
+docker run --gpus all -p 8000:8000 wllm --model Qwen/Qwen2.5-0.5B-Instruct
+```
+
+Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). On Windows this means Docker Desktop's WSL2 backend -- there's no native-Windows-container path to NVIDIA GPU compute passthrough at all, so this image reintroduces the WSL2 dependency the direct install above exists to avoid. Use it if you already have Docker + WSL2 GPU passthrough set up and want a container; use the direct install if avoiding WSL2 entirely is the point.
 
 ## Quickstart
 

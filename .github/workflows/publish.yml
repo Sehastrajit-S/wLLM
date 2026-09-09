@@ -1,0 +1,43 @@
+name: Publish to PyPI
+
+# Runs when a GitHub Release is published (Releases > Draft a new release,
+# tag e.g. v0.1.0) -- not on every push to main, since a PyPI version can
+# never be reused once published, so this should be a deliberate act, not
+# automatic on every commit.
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      # Trusted Publishing: PyPI exchanges this workflow's OIDC identity for
+      # a short-lived upload token itself -- no PYPI_API_TOKEN secret ever
+      # exists in this repo. Requires a one-time pending-publisher
+      # registration on PyPI's side first (see README/CONTRIBUTING for the
+      # exact steps) -- id-token: write is what lets this job present that
+      # OIDC identity at all.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
