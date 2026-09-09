@@ -6,7 +6,7 @@
 # `pip install beautifulsoup4` gives you `import bs4`. `import wllm` and the
 # wllm-server CLI command are both unaffected by this.
 name = "wllm-server"
-version = "0.1.0"
+version = "0.1.1"
 description = "A vLLM-style, production-grade LLM inference server built natively for Windows (single GPU, single machine)"
 readme = "README.md"
 license = "Apache-2.0"
