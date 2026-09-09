@@ -1,5 +1,11 @@
 [project]
-name = "wllm"
+# PyPI's project-name similarity check rejected "wllm" as too close to the
+# real "vllm" package (unsurprising, given the whole point of this project
+# is reimplementing vLLM's ideas). This is the *distribution* name only --
+# it doesn't have to match the importable package name, the same way
+# `pip install beautifulsoup4` gives you `import bs4`. `import wllm` and the
+# wllm-server CLI command are both unaffected by this.
+name = "wllm-server"
 version = "0.1.0"
 description = "A vLLM-style, production-grade LLM inference server built natively for Windows (single GPU, single machine)"
 readme = "README.md"

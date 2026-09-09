@@ -100,9 +100,11 @@ You don't need to manually configure `PATH`/`CUDA_HOME`/`vcvarsall.bat`. wLLM lo
 ## Installation
 
 ```bash
-pip install wllm
-# or: uv pip install wllm / uv add wllm
+pip install wllm-server
+# or: uv pip install wllm-server / uv add wllm-server
 ```
+
+(The PyPI package is named `wllm-server` -- "wllm" alone was rejected as too similar to the real `vllm` package. `import wllm` and the `wllm-server` CLI command are unaffected.)
 
 Or from source:
 
