@@ -72,7 +72,7 @@ class Scheduler:
         self,
         model,
         cache: KVCacheManager,
-        device: str = "cuda",
+        device: str | torch.device | None = None,
         graph_decoder=None,
         max_prefill_tokens_per_step: int | None = None,
         enable_cpu_swap: bool = False,
@@ -120,7 +120,14 @@ class Scheduler:
         """
         self.model = model
         self.cache = cache
-        self.device = device
+        # Defaulting to "cuda" unconditionally used to be a real footgun for
+        # CPU inference: a CPU model + CPU cache handed to a Scheduler that
+        # silently assumed "cuda" would build its own device-mismatched
+        # tensors (e.g. the eager decode token_ids at the bottom of this
+        # file) and crash. Deriving from the model's own parameters instead
+        # means a caller who already built everything on one device never
+        # needs to also remember to repeat that choice here.
+        self.device = torch.device(device) if device is not None else next(model.parameters()).device
         self.graph_decoder = graph_decoder
         self.max_prefill_tokens_per_step = max_prefill_tokens_per_step
         self.enable_cpu_swap = enable_cpu_swap

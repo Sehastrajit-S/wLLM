@@ -42,9 +42,8 @@ def reference_paged_attention(q, k_cache, v_cache, block_tables, context_lens, s
     return out
 
 
-def make_random_case(context_lens: list[int], seed: int = 0):
+def make_random_case(context_lens: list[int], seed: int = 0, device: str = "cuda"):
     torch.manual_seed(seed)
-    device = "cuda"
     num_seqs = len(context_lens)
     max_ctx = max(context_lens)
     max_blocks_per_seq = (max_ctx + BLOCK_SIZE - 1) // BLOCK_SIZE
@@ -89,4 +88,22 @@ def test_paged_attention_matches_reference(context_lens):
     ref_out = reference_paged_attention(q, k_cache, v_cache, block_tables, context_lens_t, scale)
 
     diff = (kernel_out - ref_out).abs()
+    assert diff.max().item() < 1e-3, f"max diff {diff.max().item()} for context_lens={context_lens}"
+
+
+@pytest.mark.parametrize("context_lens", [[1], [5], [16], [17], [33], [100], [1, 5, 16, 17, 33, 100]])
+def test_paged_attention_cpu_fallback_matches_reference(context_lens):
+    """paged_attention_decode() dispatches to a plain-PyTorch fallback (see
+    kernels/paged_attention.py) when q isn't a CUDA tensor, so CPU inference
+    doesn't need the CUDA kernel at all -- this is what makes that fallback's
+    own decode path (Attention.forward_decode calls paged_attention_decode
+    unconditionally, same as the CUDA path) correct, independent of whether
+    CUDA is even available on this machine.
+    """
+    q, k_cache, v_cache, block_tables, context_lens_t, scale = make_random_case(context_lens, device="cpu")
+
+    cpu_out = paged_attention_decode(q, k_cache, v_cache, block_tables, context_lens_t, scale)
+    ref_out = reference_paged_attention(q, k_cache, v_cache, block_tables, context_lens_t, scale)
+
+    diff = (cpu_out - ref_out).abs()
     assert diff.max().item() < 1e-3, f"max diff {diff.max().item()} for context_lens={context_lens}"

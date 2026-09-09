@@ -123,6 +123,7 @@ class ServerState:
 
 def create_app(
     model_id: str,
+    device: str = "cuda",
     num_blocks: int = 256,
     block_size: int = 16,
     dtype: torch.dtype = torch.bfloat16,
@@ -197,9 +198,9 @@ def create_app(
     async def lifespan(app: FastAPI):
         tokenizer = AutoTokenizer.from_pretrained(tokenizer_id or model_id)
         if gguf_path:
-            model = load_gguf(gguf_path, device="cuda", compute_dtype=dtype)
+            model = load_gguf(gguf_path, device=device, compute_dtype=dtype)
         else:
-            model = load_native(model_id, dtype=dtype)
+            model = load_native(model_id, device=device, dtype=dtype)
 
         effective_num_blocks = num_blocks
         if use_cuda_graphs:
@@ -210,7 +211,7 @@ def create_app(
             block_size=block_size,
             num_kv_heads=model.cfg.num_key_value_heads,
             head_dim=model.cfg.head_dim,
-            device="cuda",
+            device=device,
             dtype=torch.float32,
             enable_prefix_caching=enable_prefix_caching,
         )
@@ -224,11 +225,12 @@ def create_app(
 
         lora_registry = LoRARegistry()
         for adapter_name, adapter_path in (lora_modules or {}).items():
-            lora_registry.load_adapter(adapter_name, adapter_path, device="cuda", dtype=dtype)
+            lora_registry.load_adapter(adapter_name, adapter_path, device=device, dtype=dtype)
         engine = AsyncEngine(
             model,
             cache,
             tokenizer,
+            device=device,
             graph_decoder=graph_decoder,
             max_prefill_tokens_per_step=max_prefill_tokens_per_step,
             enable_cpu_swap=enable_cpu_swap,
@@ -285,7 +287,7 @@ def create_app(
     @app.post("/v1/load_lora_adapter")
     async def load_lora_adapter(req: LoadLoRARequest):
         engine = _engine()
-        engine.lora_registry.load_adapter(req.lora_name, req.lora_path, device="cuda", dtype=dtype)
+        engine.lora_registry.load_adapter(req.lora_name, req.lora_path, device=device, dtype=dtype)
         return {"status": "success", "lora_name": req.lora_name}
 
     @app.post("/v1/unload_lora_adapter")
@@ -304,7 +306,7 @@ def create_app(
         data = []
         for i, text in enumerate(texts):
             prompt_tokens += len(engine.tokenizer.encode(text, add_special_tokens=False))
-            vec = embed_text(engine.model, engine.tokenizer, text, device="cuda")
+            vec = embed_text(engine.model, engine.tokenizer, text, device=device)
             data.append(EmbeddingData(index=i, embedding=vec.tolist()))
 
         return EmbeddingResponse(
@@ -318,10 +320,10 @@ def create_app(
         REQUESTS_TOTAL.labels(endpoint="rerank").inc()
         engine = _engine()
 
-        query_vec = embed_text(engine.model, engine.tokenizer, req.query, device="cuda")
+        query_vec = embed_text(engine.model, engine.tokenizer, req.query, device=device)
         results = []
         for i, doc in enumerate(req.documents):
-            doc_vec = embed_text(engine.model, engine.tokenizer, doc, device="cuda")
+            doc_vec = embed_text(engine.model, engine.tokenizer, doc, device=device)
             results.append(RerankResult(index=i, relevance_score=cosine_similarity(query_vec, doc_vec)))
 
         results.sort(key=lambda r: r.relevance_score, reverse=True)

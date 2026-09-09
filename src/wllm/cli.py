@@ -19,6 +19,10 @@ from wllm.baseline.model import DEFAULT_MODEL_ID
 def main() -> int:
     parser = argparse.ArgumentParser(description="wLLM OpenAI-compatible server")
     parser.add_argument("--model", default=DEFAULT_MODEL_ID)
+    parser.add_argument(
+        "--device", default="cuda", choices=["cuda", "cpu"],
+        help="cpu runs correctly but without the CUDA PagedAttention kernel's speed or CUDA graph support (incompatible with --cuda-graphs)",
+    )
     parser.add_argument("--gguf", default=None, help="Path to a GGUF file -- loads quantized weights instead of --model's safetensors")
     parser.add_argument("--tokenizer", default=None, help="HF tokenizer repo to use with --gguf (defaults to --model)")
     parser.add_argument("--host", default="0.0.0.0")
@@ -52,10 +56,14 @@ def main() -> int:
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     args = parser.parse_args()
 
+    if args.device == "cpu" and args.cuda_graphs:
+        parser.error("--cuda-graphs requires --device cuda (CUDA graphs have no CPU equivalent)")
+
     dtype = {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}[args.dtype]
     lora_modules = dict(entry.split("=", 1) for entry in args.lora_modules) if args.lora_modules else None
     app = create_app(
         args.model,
+        device=args.device,
         num_blocks=args.num_blocks,
         block_size=args.block_size,
         dtype=dtype,

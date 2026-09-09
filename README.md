@@ -87,12 +87,15 @@ wLLM and vLLM were each run with their fastest available configuration: wLLM wit
 ## Requirements
 
 - Windows 10/11
-- An NVIDIA GPU (compute capability 7.0+; developed and tested on an RTX 3060)
-- [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (matching your installed driver)
-- Visual Studio 2022 (or Build Tools) with the "Desktop development with C++" workload, for MSVC
 - Python 3.11 or 3.12
+- For GPU inference (the default, and the only way to get PagedAttention's real performance and CUDA graphs): an NVIDIA GPU (compute capability 7.0+; developed and tested on an RTX 3060), the [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (matching your installed driver), and Visual Studio 2022 (or Build Tools) with the "Desktop development with C++" workload, for MSVC
+- For CPU inference (`--device cpu`): none of the above -- see below
 
 You don't need to manually configure `PATH`/`CUDA_HOME`/`vcvarsall.bat`. wLLM locates MSVC and CUDA automatically the first time it needs to build its kernel (see [`src/wllm/kernels/_msvc_env.py`](src/wllm/kernels/_msvc_env.py)).
+
+### CPU inference
+
+`--device cpu` runs the real engine (continuous batching, paged KV cache, prefix caching, LoRA, guided decoding, all of it) with no GPU, no CUDA Toolkit, and no MSVC -- the custom PagedAttention CUDA kernel is only ever JIT-compiled on the CUDA path; on CPU, decode instead runs a plain-PyTorch fallback with the same math (see [`src/wllm/kernels/paged_attention.py`](src/wllm/kernels/paged_attention.py)). This is a correctness fallback, not a performance target: no PagedAttention kernel speed and no CUDA graphs (`--cuda-graphs` is rejected together with `--device cpu`, since graph capture has no CPU equivalent at all). Useful for developing/testing wLLM on a machine without an NVIDIA GPU, not for serving real traffic.
 
 ## Installation
 
@@ -141,7 +144,7 @@ Being upfront about scope, same as the rest of this README:
 
 - Multi-GPU / multi-node (single GPU, single machine only)
 - Multi-modal / vision-language models
-- AMD or non-NVIDIA GPUs, DirectML
+- AMD or non-NVIDIA GPUs, DirectML. `torch-directml` was evaluated and rejected for now: its latest release is pinned to an older PyTorch version than wLLM already depends on, so the two currently can't coexist in one environment regardless of engineering effort here.
 - The PagedAttention kernel is warp-parallel but not yet using tensor cores or fp16 native arithmetic; see the benchmark numbers above for where that leaves it relative to vLLM
 
 ## Development

@@ -31,7 +31,7 @@ class AsyncEngine:
         model,
         cache: KVCacheManager,
         tokenizer,
-        device: str = "cuda",
+        device: str | None = None,
         graph_decoder=None,
         max_prefill_tokens_per_step: int | None = None,
         enable_cpu_swap: bool = False,

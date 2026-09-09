@@ -40,6 +40,18 @@ class CUDAGraphDecoder:
         max_blocks_per_seq: int = 256,
         device: str = "cuda",
     ):
+        # CUDA graphs are, definitionally, a CUDA-only capability -- there's
+        # no portable equivalent to capture on CPU. Failing here with a
+        # clear message beats the alternative: without this check, capture()
+        # would instead die deep inside torch.cuda.Stream() with a cryptic
+        # error unrelated to what the caller actually did wrong. CPU
+        # inference just means never constructing a CUDAGraphDecoder at all
+        # (Scheduler's graph_decoder is optional, defaulting to None).
+        if not torch.device(device).type == "cuda":
+            raise ValueError(
+                f"CUDAGraphDecoder requires a CUDA device, got {device!r}. "
+                "For CPU inference, construct the Scheduler without a graph_decoder instead."
+            )
         self.model = model
         self.cache = cache
         self.bucket_sizes = tuple(sorted(bucket_sizes))
