@@ -181,6 +181,14 @@ ruff check src/ tests/ scripts/
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Collaborators
+
+<a href="https://github.com/Sehastrajit-S">
+  <img src="icons/collabrators/sehas.jpg" width="80" style="border-radius:50%" alt="Sehastrajit">
+</a>
+
+[Sehastrajit](https://github.com/Sehastrajit-S)
+
 ## License
 
 Apache 2.0, see [LICENSE](LICENSE).
