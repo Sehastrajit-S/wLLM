@@ -21,9 +21,18 @@ class ModelConfig:
     max_position_embeddings: int
     tie_word_embeddings: bool
     attention_bias: bool = True
+    # Llama/Qwen2 never set this in config.json (head_dim is always exactly
+    # hidden_size // num_attention_heads for them). Gemma is the first
+    # architecture here where that's false -- e.g. real gemma-7b has
+    # hidden_size=3072, num_attention_heads=16 (192 per head by division),
+    # but its actual head_dim is 256, set explicitly. None here means "derive
+    # it", matching every existing checkpoint's behavior unchanged.
+    explicit_head_dim: int | None = None
 
     @property
     def head_dim(self) -> int:
+        if self.explicit_head_dim is not None:
+            return self.explicit_head_dim
         return self.hidden_size // self.num_attention_heads
 
     @classmethod
@@ -58,4 +67,5 @@ class ModelConfig:
             max_position_embeddings=raw.get("max_position_embeddings", 4096),
             tie_word_embeddings=raw.get("tie_word_embeddings", False),
             attention_bias=bool(attention_bias),
+            explicit_head_dim=raw.get("head_dim"),
         )
