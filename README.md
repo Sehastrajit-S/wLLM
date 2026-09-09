@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="icons/wLLM.png" width="220" alt="wLLM logo">
+  <img src="https://raw.githubusercontent.com/Sehastrajit-S/wLLM/main/icons/wLLM.png" width="220" alt="wLLM logo">
 
   # wLLM
 
@@ -65,11 +65,11 @@ Weight format: HF safetensors (bf16/fp16, VRAM permitting) or a single-file GGUF
 
 Three points of comparison, same RTX 3060, same prompt, same decode-only methodology: plain HuggingFace `transformers` (no serving engine at all, just `AutoModelForCausalLM` and its own KV cache), wLLM, and real vLLM 0.28.0. vLLM was run under WSL2, since it has no native Windows support at all, so this is the closest possible apples-to-apples comparison on identical hardware.
 
-![Decode throughput: no serving engine vs wLLM vs vLLM](benchmarks/throughput_chart.png)
+![Decode throughput: no serving engine vs wLLM vs vLLM](https://raw.githubusercontent.com/Sehastrajit-S/wLLM/main/benchmarks/throughput_chart.png)
 
 Two things stand out. First, a real serving engine is a genuine, substantial win over doing nothing: wLLM is 1.3-3.8x faster than plain `transformers`, vLLM 1.6-6.0x, purely from PagedAttention, continuous batching, and CUDA graphs, same weights and same GPU either way. Second, that gain shrinks as the model grows, from roughly 4-6x at 0.5B down to about 1.3-1.8x at 3B: at small model sizes, per-step Python and kernel-launch overhead dominates, and that's exactly what a serving engine eliminates; at 3B, raw matmul compute is a bigger share of the total, so there's proportionally less overhead left to cut.
 
-![Decode throughput table: no serving engine vs wLLM vs vLLM](benchmarks/throughput_table.png)
+![Decode throughput table: no serving engine vs wLLM vs vLLM](https://raw.githubusercontent.com/Sehastrajit-S/wLLM/main/benchmarks/throughput_table.png)
 
 wLLM captures most of the value vLLM adds over plain `transformers`, not just a small fraction of it: at 0.5B it gets roughly 64-77% of vLLM's speedup-over-baseline, and by 3B it's essentially matching vLLM's gain over baseline (85%+). The remaining wLLM-vs-vLLM gap (vLLM still leads by 1.2-1.6x outright, mostly from its more heavily-optimized attention kernels and `torch.compile` fusion) is a gap between two already-optimized systems, not "optimized vs. unoptimized."
 
@@ -184,7 +184,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Collaborators
 
 <a href="https://github.com/Sehastrajit-S">
-  <img src="icons/collabrators/sehas.jpg" width="80" style="border-radius:50%" alt="Sehastrajit">
+  <img src="https://raw.githubusercontent.com/Sehastrajit-S/wLLM/main/icons/collabrators/sehas.jpg" width="80" style="border-radius:50%" alt="Sehastrajit">
 </a>
 
 [Sehastrajit](https://github.com/Sehastrajit-S)
