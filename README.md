@@ -8,6 +8,11 @@
   [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
   [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](pyproject.toml)
   [![CI](https://github.com/Sehastrajit-S/wLLM/actions/workflows/ci.yml/badge.svg)](https://github.com/Sehastrajit-S/wLLM/actions/workflows/ci.yml)
+  [![PyPI](https://img.shields.io/pypi/v/wllm-server.svg)](https://pypi.org/project/wllm-server/)
+
+  ```bash
+  pip install wllm-server
+  ```
 </div>
 
 ---
